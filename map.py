@@ -1,49 +1,63 @@
 import networkx as nx
-from collections import deque
+import matplotlib.pyplot as plt
 import heapq
 import itertools
-import matplotlib.pyplot as plt
+from collections import deque
 
+# Node names
+nodes = [ 'Dhaka','Chattogram', 'Rajshahi', 'Barishal', 'Khulna', 'Rangpur', 'Mymensingh', 'Sylhet']
+n = len(nodes)
 
-# গ্রাফ ডেটা
-graph = {
-    'Dhaka': ['Barisal', 'Chattogram'],
-    'Chattogram': ['Sylhet', 'Dhaka'],
-    'Khulna': ['Rajshahi', 'Barisal'],
-    'Rajshahi': ['Rangpur', 'Khulna'],
-    'Barisal': ['Khulna', 'Dhaka'],
-    'Sylhet': ['Chattogram'],
-    'Rangpur': ['Rajshahi']
-}
+# Adjacency Matrix
+adj_matrix = [
+    [0, 0, 1, 1, 0, 0, 0, 0],
+    [0, 0, 1, 0, 0, 0, 0, 1],
+    [1, 1, 0, 0, 0, 0, 1, 1],
+    [1, 0, 0, 0, 1, 0, 0, 0],
+    [0, 0, 0, 1, 0, 1, 0, 0],
+    [0, 0, 0, 0, 1, 0, 0, 0],
+    [0, 0, 1, 0, 0, 0, 0, 1],
+    [0, 1, 1, 0, 0, 0, 1, 0]
+]
 
 colors = ['red', 'green', 'blue', 'yellow']
 
-# ভিজ্যুয়াল অবস্থান (বাংলাদেশের মতো)
+# Position for plotting
 pos = {
     'Dhaka': (0, 0),
-    'Barisal': (-1, -1),
-    'Chattogram': (2, 2),
-    'Sylhet': (3, 3),
-    'Khulna': (-2, -1),
+    'Barishal': (-1, -1),
+    'Chattogram': (2, -1),
+    'Khulna': (-2, -2),
     'Rajshahi': (-3, 0),
-    'Rangpur': (-4, 1)
+    'Rangpur': (-3, 2),
+    'Mymensingh': (1, 1),
+    'Sylhet': (3, 1)
 }
 
-# কমন plot ফাংশন
+def get_neighbors(index):
+    return [i for i in range(n) if adj_matrix[index][i] == 1]
+
+def is_valid(state, node_index, color):
+    for neighbor_index in get_neighbors(node_index):
+        if neighbor_index in state and state[neighbor_index] == color:
+            return False
+    return True
+
 def plot_graph(state, current_node=None, title="Map Coloring"):
     G = nx.Graph()
-    for node in graph:
-        G.add_node(node)
-    for node, neighbors in graph.items():
-        for neighbor in neighbors:
-            G.add_edge(node, neighbor)
+    for i in range(n):
+        G.add_node(nodes[i])
+    for i in range(n):
+        for j in range(i+1, n):
+            if adj_matrix[i][j] == 1:
+                G.add_edge(nodes[i], nodes[j])
 
     node_colors = []
-    for node in G.nodes():
-        if node == current_node:
+    for i in range(n):
+        if i == current_node:
             node_colors.append('gold')
-        elif node in state:
-            node_colors.append(state[node])
+        elif i in state:
+            node_colors.append(state[i])
         else:
             node_colors.append('lightgray')
 
@@ -53,26 +67,18 @@ def plot_graph(state, current_node=None, title="Map Coloring"):
     plt.title(title)
     plt.pause(0.5)
 
-# রঙ বৈধ কি না যাচাই
-def is_valid(state, node, color):
-    for neighbor in graph.get(node, []):
-        if neighbor in state and state[neighbor] == color:
-            return False
-    return True
-
-# ব্যাকট্র্যাকিং এলগরিদম
 def backtracking_coloring(state):
     if len(state) == 0:
-        state['Rangpur'] = 'yellow'
-        plot_graph(state, current_node='Rangpur', title="Backtracking")
+        state[5] = 'yellow'  # Rangpur fixed
+        plot_graph(state, current_node=5, title="Backtracking")
 
-    if len(state) == len(graph):
+    if len(state) == n:
         return state
 
-    uncolored = [node for node in graph if node not in state]
+    uncolored = [i for i in range(n) if i not in state]
     node = uncolored[0]
     for color in colors:
-        if node == 'Rangpur' and color != 'yellow':
+        if node == 5 and color != 'yellow':
             continue
         if is_valid(state, node, color):
             state[node] = color
@@ -83,20 +89,19 @@ def backtracking_coloring(state):
             del state[node]
     return None
 
-# BFS এলগরিদম
 def bfs_coloring():
     state = {}
     queue = deque()
-    state['Rangpur'] = 'yellow'
-    queue.append('Rangpur')
-    plot_graph(state, current_node='Rangpur', title="BFS")
+    state[5] = 'yellow'
+    queue.append(5)
+    plot_graph(state, current_node=5, title="BFS")
 
     while queue:
         node = queue.popleft()
-        for neighbor in graph[node]:
+        for neighbor in get_neighbors(node):
             if neighbor not in state:
                 for color in colors:
-                    if neighbor == 'Rangpur' and color != 'yellow':
+                    if neighbor == 5 and color != 'yellow':
                         continue
                     if is_valid(state, neighbor, color):
                         state[neighbor] = color
@@ -105,47 +110,43 @@ def bfs_coloring():
                         break
     return state
 
-# UCS এলগরিদম
 def ucs_coloring():
     queue = []
     counter = itertools.count()
-    start_state = {'Rangpur': 'yellow'}
+    start_state = {5: 'yellow'}
     heapq.heappush(queue, (0, next(counter), start_state))
 
     step = 0
     while queue:
         cost, _, state = heapq.heappop(queue)
-        if len(state) == len(graph):
+        if len(state) == n:
             return state
 
-        uncolored = [node for node in graph if node not in state]
+        uncolored = [i for i in range(n) if i not in state]
         if not uncolored:
             continue
 
         node = uncolored[0]
         for color in colors:
-            if node == 'Rangpur' and color != 'yellow':
+            if node == 5 and color != 'yellow':
                 continue
             if is_valid(state, node, color):
                 new_state = state.copy()
                 new_state[node] = color
                 step += 1
-                if step % 5 == 0:
+                if step % 4 == 0:
                     plot_graph(new_state, current_node=node, title="UCS")
                 heapq.heappush(queue, (cost + 1, next(counter), new_state))
     return None
 
-# প্রিন্ট ফাংশন
-def print_coloring(state, algorithm_name):
-    print(f"\n{algorithm_name} Coloring Result:")
-    for division, color in state.items():
-        print(f"{division}: {color}")
-    print()
+def print_coloring(state, name):
+    print(f"\n{name} Coloring Result:")
+    for i in range(n):
+        print(f"{nodes[i]}: {state.get(i, 'Uncolored')}")
 
-# মেইন ফাংশন
 if __name__ == "__main__":
     plt.ion()
-    plt.figure(figsize=(8,6))
+    plt.figure(figsize=(10, 8))
 
     print("Running Backtracking...\n")
     result = backtracking_coloring({})
